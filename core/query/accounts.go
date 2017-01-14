@@ -31,12 +31,12 @@ func (ind *Indexer) Accounts(ctx context.Context, p filter.Predicate, vals []int
 	if len(vals) != p.Parameters {
 		return nil, "", ErrParameterCountMismatch
 	}
-	expr, err := filter.AsSQL(p, "data", vals)
+	expr, err := filter.AsSQL(p, accountsTable, vals)
 	if err != nil {
 		return nil, "", errors.Wrap(err, "converting to SQL")
 	}
 
-	queryStr, queryArgs := constructAccountsQuery(expr, after, limit)
+	queryStr, queryArgs := constructAccountsQuery(expr, vals, after, limit)
 	rows, err := ind.db.Query(ctx, queryStr, queryArgs...)
 	if err != nil {
 		return nil, "", errors.Wrap(err, "executing acc query")
@@ -64,18 +64,16 @@ func (ind *Indexer) Accounts(ctx context.Context, p filter.Predicate, vals []int
 	return accounts, after, errors.Wrap(rows.Err())
 }
 
-func constructAccountsQuery(expr filter.SQLExpr, after string, limit int) (string, []interface{}) {
+func constructAccountsQuery(expr string, vals []interface{}, after string, limit int) (string, []interface{}) {
 	var buf bytes.Buffer
-	var vals []interface{}
 
 	buf.WriteString("SELECT id, data FROM annotated_accounts")
 	buf.WriteString(" WHERE ")
 
 	// add filter conditions
-	if len(expr.SQL) > 0 {
-		vals = append(vals, expr.Values...)
+	if len(expr) > 0 {
 		buf.WriteString("(")
-		buf.WriteString(expr.SQL)
+		buf.WriteString(expr)
 		buf.WriteString(") AND ")
 	}
 

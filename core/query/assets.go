@@ -20,8 +20,10 @@ func (ind *Indexer) SaveAnnotatedAsset(ctx context.Context, asset *AnnotatedAsse
 	}
 
 	const q = `
-		INSERT INTO annotated_assets (id, data, sort_id) VALUES($1, $2, $3)
-		ON CONFLICT (id) DO UPDATE SET data = $2, sort_id = $3
+		INSERT INTO annotated_assets
+			(id, data, sort_id, alias, issuance_program, keys, quorum, definition, tags, local)
+		VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		ON CONFLICT (id) DO UPDATE SET data = $2, sort_id = $3, tags = $4
 	`
 	_, err = ind.db.Exec(ctx, q, hex.EncodeToString(asset.ID), b, sortID)
 	return errors.Wrap(err, "saving annotated asset")
@@ -32,12 +34,12 @@ func (ind *Indexer) Assets(ctx context.Context, p filter.Predicate, vals []inter
 	if len(vals) != p.Parameters {
 		return nil, "", ErrParameterCountMismatch
 	}
-	expr, err := filter.AsSQL(p, "data", vals)
+	expr, err := filter.AsSQL(p, assetsTable, vals)
 	if err != nil {
 		return nil, "", errors.Wrap(err, "converting to SQL")
 	}
 
-	queryStr, queryArgs := constructAssetsQuery(expr, after, limit)
+	queryStr, queryArgs := constructAssetsQuery(expr, vals, after, limit)
 	rows, err := ind.db.Query(ctx, queryStr, queryArgs...)
 	if err != nil {
 		return nil, "", errors.Wrap(err, "executing assets query")
@@ -72,18 +74,16 @@ func (ind *Indexer) Assets(ctx context.Context, p filter.Predicate, vals []inter
 	return assets, after, nil
 }
 
-func constructAssetsQuery(expr filter.SQLExpr, after string, limit int) (string, []interface{}) {
+func constructAssetsQuery(expr string, vals []interface{}, after string, limit int) (string, []interface{}) {
 	var buf bytes.Buffer
-	var vals []interface{}
 
 	buf.WriteString("SELECT sort_id, data FROM annotated_assets")
 	buf.WriteString(" WHERE ")
 
 	// add filter conditions
-	if len(expr.Values) > 0 {
-		vals = append(vals, expr.Values...)
+	if len(expr) > 0 {
 		buf.WriteString("(")
-		buf.WriteString(expr.SQL)
+		buf.WriteString(expr)
 		buf.WriteString(") AND ")
 	}
 

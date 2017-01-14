@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 
 	"github.com/lib/pq"
@@ -63,54 +64,77 @@ func (ind *Indexer) insertBlock(ctx context.Context, b *bc.Block) error {
 
 func (ind *Indexer) insertAnnotatedTxs(ctx context.Context, b *bc.Block) ([]*AnnotatedTx, error) {
 	var (
-		hashes              = pq.ByteaArray(make([][]byte, 0, len(b.Transactions)))
-		positions           = pg.Uint32s(make([]uint32, 0, len(b.Transactions)))
-		annotatedTxs        = pq.StringArray(make([]string, 0, len(b.Transactions)))
-		annotatedTxsDecoded = make([]*AnnotatedTx, 0, len(b.Transactions))
+		hashes           = pq.ByteaArray(make([][]byte, 0, len(b.Transactions)))
+		positions        = pg.Uint32s(make([]uint32, 0, len(b.Transactions)))
+		annotatedTxBlobs = pq.StringArray(make([]string, 0, len(b.Transactions)))
+		annotatedTxs     = make([]*AnnotatedTx, 0, len(b.Transactions))
+		locals           = pq.BoolArray(make([]bool, 0, len(b.Transactions)))
+		referenceDatas   = pq.StringArray(make([]string, 0, len(b.Transactions)))
 	)
-	for pos, tx := range b.Transactions {
-		hashes = append(hashes, tx.Hash[:])
-		positions = append(positions, uint32(pos))
-		annotatedTxsDecoded = append(annotatedTxsDecoded, buildAnnotatedTransaction(tx, b, uint32(pos)))
-	}
 
+	// Build the fully annotated transactions.
+	for pos, tx := range b.Transactions {
+		annotatedTxs = append(annotatedTxs, buildAnnotatedTransaction(tx, b, uint32(pos)))
+	}
 	for _, annotator := range ind.annotators {
-		err := annotator(ctx, annotatedTxsDecoded)
+		err := annotator(ctx, annotatedTxs)
 		if err != nil {
 			return nil, errors.Wrap(err, "adding external annotations")
 		}
 	}
-	localAnnotator(ctx, annotatedTxsDecoded)
+	localAnnotator(ctx, annotatedTxs)
 
-	for _, decoded := range annotatedTxsDecoded {
-		b, err := json.Marshal(decoded)
+	// Collect the fields we need to commit to the DB.
+	for pos, tx := range annotatedTxs {
+		b, err := json.Marshal(tx)
 		if err != nil {
 			return nil, err
 		}
-		annotatedTxs = append(annotatedTxs, string(b))
+		annotatedTxBlobs = append(annotatedTxBlobs, string(b))
+		hashes = append(hashes, tx.ID)
+		positions = append(positions, uint32(pos))
+		locals = append(locals, bool(tx.IsLocal))
+		referenceDatas = append(referenceDatas, string(*tx.ReferenceData))
 	}
 
 	// Save the annotated txs to the database.
 	const insertQ = `
-		INSERT INTO annotated_txs(block_height, tx_pos, tx_hash, data)
-		SELECT $1, unnest($2::integer[]), unnest($3::bytea[]), unnest($4::jsonb[])
+		INSERT INTO annotated_txs(block_height, block_id, timestamp,
+			tx_pos, tx_hash, data, local, reference_data)
+		SELECT $1, $2, $3, unnest($4::integer[]), unnest($5::bytea[]),
+			unnest($6::jsonb[]), unnest($7::boolean[]), unnest($8::jsonb[])
 		ON CONFLICT (block_height, tx_pos) DO NOTHING;
 	`
-	_, err := ind.db.Exec(ctx, insertQ, b.Height, positions, hashes, annotatedTxs)
+	_, err := ind.db.Exec(ctx, insertQ, b.Height, b.Hash(), b.Time(), positions,
+		hashes, annotatedTxBlobs, locals, referenceDatas)
 	if err != nil {
 		return nil, errors.Wrap(err, "inserting annotated_txs to db")
 	}
-	return annotatedTxsDecoded, nil
+	return annotatedTxs, nil
 }
 
 func (ind *Indexer) insertAnnotatedOutputs(ctx context.Context, b *bc.Block, annotatedTxs []*AnnotatedTx) error {
 	var (
-		outputTxPositions pg.Uint32s
-		outputIndexes     pg.Uint32s
-		outputTxHashes    pq.ByteaArray
-		outputData        pq.StringArray
-		prevoutHashes     pq.ByteaArray
-		prevoutIndexes    pg.Uint32s
+		outputTxPositions      pg.Uint32s
+		outputIndexes          pg.Uint32s
+		outputTxHashes         pq.ByteaArray
+		outputTypes            pq.StringArray
+		outputPurposes         []sql.NullString
+		outputAssetIDs         pq.ByteaArray
+		outputAssetAliases     []sql.NullString
+		outputAssetDefinitions pq.StringArray
+		outputAssetTags        pq.StringArray
+		outputAssetLocals      pq.BoolArray
+		outputAmounts          pq.Int64Array
+		outputAccountIDs       []sql.NullString
+		outputAccountAliases   []sql.NullString
+		outputAccountTags      []sql.NullString
+		outputControlPrograms  pq.ByteaArray
+		outputReferenceDatas   pq.StringArray
+		outputLocals           pq.BoolArray
+		outputDatas            pq.StringArray
+		prevoutHashes          pq.ByteaArray
+		prevoutIndexes         pg.Uint32s
 	)
 
 	for pos, tx := range b.Transactions {
@@ -137,19 +161,48 @@ func (ind *Indexer) insertAnnotatedOutputs(ctx context.Context, b *bc.Block, ann
 			outputTxPositions = append(outputTxPositions, uint32(pos))
 			outputIndexes = append(outputIndexes, uint32(outIndex))
 			outputTxHashes = append(outputTxHashes, tx.Hash[:])
-			outputData = append(outputData, string(serializedData))
+			outputTypes = append(outputTypes, out.Type)
+			outputPurposes = append(outputPurposes, sql.NullString{String: out.Purpose, Valid: out.Purpose != ""})
+			outputAssetIDs = append(outputAssetIDs, out.AssetID)
+			outputAssetAliases = append(outputAssetAliases, sql.NullString{String: out.AssetAlias, Valid: out.AssetAlias != ""})
+			outputAssetDefinitions = append(outputAssetDefinitions, string(*out.AssetDefinition))
+			outputAssetTags = append(outputAssetTags, string(*out.AssetTags))
+			outputAssetLocals = append(outputAssetLocals, bool(out.AssetIsLocal))
+			outputAmounts = append(outputAmounts, int64(out.Amount))
+			outputAccountIDs = append(outputAccountIDs, sql.NullString{String: out.AccountID, Valid: out.AccountID != ""})
+			outputAccountAliases = append(outputAccountAliases, sql.NullString{String: out.AccountAlias, Valid: out.AccountAlias != ""})
+			if out.AccountTags != nil {
+				outputAccountTags = append(outputAccountTags, sql.NullString{String: string(*out.AccountTags), Valid: true})
+			} else {
+				outputAccountTags = append(outputAccountTags, sql.NullString{})
+			}
+			outputControlPrograms = append(outputControlPrograms, out.ControlProgram)
+			outputReferenceDatas = append(outputReferenceDatas, string(*out.ReferenceData))
+			outputLocals = append(outputLocals, bool(out.IsLocal))
+			outputDatas = append(outputDatas, string(serializedData))
 		}
 	}
 
 	// Insert all of the block's outputs at once.
 	const insertQ = `
-		INSERT INTO annotated_outputs (block_height, tx_pos, output_index, tx_hash, data, timespan)
+		INSERT INTO annotated_outputs (block_height, tx_pos, output_index, tx_hash,
+			data, timespan, type, purpose, asset_id, asset_alias, asset_definition,
+			asset_tags, asset_local, amount, account_id, account_alias, account_tags,
+			control_program, reference_data, local)
 		SELECT $1, unnest($2::integer[]), unnest($3::integer[]), unnest($4::bytea[]),
-		           unnest($5::jsonb[]),   int8range($6, NULL)
+		unnest($5::jsonb[]), int8range($6, NULL), unnest($7::text[]), unnest($8::bytea[]),
+		unnest($9::bytea[]), unnest($10::text[]), unnest($11::jsonb[]), unnest($12::jsonb[]),
+		unnest($13::boolean[]), unnest($14::bigint[]), unnest($15::text[]), unnest($16::text[]),
+		unnest($17::jsonb[]), unnest($18::bytea[]), unnest($19::jsonb[]), unnest($20::boolean[])
 		ON CONFLICT (block_height, tx_pos, output_index) DO NOTHING;
 	`
 	_, err := ind.db.Exec(ctx, insertQ, b.Height, outputTxPositions,
-		outputIndexes, outputTxHashes, outputData, b.TimestampMS)
+		outputIndexes, outputTxHashes, outputDatas, b.TimestampMS, outputTypes,
+		pq.Array(outputPurposes), outputAssetIDs, pq.Array(outputAssetAliases),
+		outputAssetDefinitions, outputAssetTags, outputAssetLocals,
+		outputAmounts, pq.Array(outputAccountIDs), pq.Array(outputAccountAliases),
+		pq.Array(outputAccountTags), outputControlPrograms, outputReferenceDatas,
+		outputLocals)
 	if err != nil {
 		return errors.Wrap(err, "batch inserting annotated outputs")
 	}

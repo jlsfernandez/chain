@@ -107,4 +107,127 @@ var migrations = []migration{
 	{Name: "2017-01-19.0.asset.drop-mutable-flag.sql", SQL: `
 		ALTER TABLE assets DROP COLUMN definition_mutable;
 	`},
+	{Name: "2017-01-20.0.query.annotated-schema.sql", SQL: `
+		--
+		-- Flatten annotated_outputs into schema
+		--
+		ALTER TABLE annotated_outputs
+			ADD COLUMN type text NOT NULL,
+			ADD COLUMN purpose text NOT NULL,
+			ADD COLUMN asset_id bytea NOT NULL,
+			ADD COLUMN asset_alias text,
+			ADD COLUMN asset_definition jsonb,
+			ADD COLUMN asset_tags jsonb,
+			ADD COLUMN asset_local boolean NOT NULL,
+			ADD COLUMN amount bigint NOT NULL,
+			ADD COLUMN account_id text,
+			ADD COLUMN account_alias text,
+			ADD COLUMN account_tags jsonb,
+			ADD COLUMN control_program bytea NOT NULL,
+			ADD COLUMN reference_data jsonb NOT NULL,
+			ADD COLUMN local boolean NOT NULL;
+		UPDATE annotated_outputs SET
+			type             = data->>'type',
+			purpose          = data->>'purpose',
+			asset_id         = decode(data->>'asset_id', 'hex'),
+			asset_alias      = data->>'asset_alias',
+			asset_definition = data->'asset_definition',
+			asset_tags       = data->'asset_tags',
+			asset_local      = (data->>'asset_is_local'='yes'),
+			amount           = (data->>'amount')::bigint,
+			account_id       = data->>'account_id',
+			account_alias    = data->>'account_alias',
+			account_tags     = data->'account_tags',
+			control_program  = decode(data->>'control_program', 'hex'),
+			reference_data   = data->'reference_data',
+			local            = (data->>'is_local' = 'yes');
+		ALTER TABLE annotated_outputs
+			ALTER COLUMN type SET NOT NULL,
+			ALTER COLUMN asset_id SET NOT NULL,
+			ALTER COLUMN asset_definition SET NOT NULL,
+			ALTER COLUMN asset_tags SET NOT NULL,
+			ALTER COLUMN asset_local SET NOT NULL,
+			ALTER COLUMN amount SET NOT NULL,
+			ALTER COLUMN control_program SET NOT NULL,
+			ALTER COLUMN local SET NOT NULL;
+
+		--
+		-- Flatten annotated_txs into schema
+		--
+		ALTER TABLE annotated_txs
+			ADD COLUMN "timestamp" timestamp without time zone,
+			ADD COLUMN block_id bytea,
+			ADD COLUMN local boolean,
+			ADD COLUMN reference_data jsonb;
+		UPDATE annotated_txs SET
+		    "timestamp"    = (data->>'timestamp')::timestamp without time zone,
+			block_id       = decode(data->>'block_id', 'hex'),
+			local          = (data->>'is_local' = 'yes'),
+			reference_data = data->'reference_data';
+		ALTER TABLE annotated_txs
+			ALTER COLUMN timestamp SET NOT NULL,
+			ALTER COLUMN block_id SET NOT NULL,
+			ALTER COLUMN local SET NOT NULL;
+
+		--
+		-- Introduce annotated_inputs
+		--
+		CREATE TABLE annotated_inputs (
+			tx_hash          bytea NOT NULL,
+			type             text NOT NULL,
+			asset_id         bytea NOT NULL,
+			asset_alias      text,
+			asset_definition jsonb,
+			asset_tags       jsonb,
+			asset_local      boolean NOT NULL,
+			amount           bigint NOT NULL,
+			account_id       text NOT NULL,
+			account_alias    text,
+			account_tags     jsonb,
+			issuance_program bytea,
+			local            boolean NOT NULL
+		);
+
+		--
+		-- Flatten annotated_assets into schema.
+		--
+		ALTER TABLE annotated_assets
+			ADD COLUMN alias text,
+			ADD COLUMN issuance_program bytea,
+			ADD COLUMN keys jsonb,
+			ADD COLUMN quorum integer,
+			ADD COLUMN definition jsonb,
+			ADD COLUMN tags jsonb,
+			ADD COLUMN local boolean;
+		UPDATE annotated_assets SET
+			alias            = data->>'alias',
+			issuance_program = decode(data->>'issuance_program', 'hex'),
+			keys             = data->'keys',
+			quorum           = (data->>'quorum')::integer,
+			definition       = data->'definition',
+			tags             = data->'tags',
+			local            = (data->>'is_local' = 'yes');
+		ALTER TABLE annotated_assets
+			ALTER COLUMN issuance_program SET NOT NULL,
+			ALTER COLUMN keys SET NOT NULL,
+			ALTER COLUMN quorum SET NOT NULL,
+			ALTER COLUMN local SET NOT NULL;
+
+		--
+		-- Flatten annotated_accounts into schema.
+		--
+		ALTER TABLE annotated_accounts
+			ADD COLUMN alias text,
+			ADD COLUMN keys jsonb,
+			ADD COLUMN quorum integer,
+			ADD COLUMN tags jsonb;
+		UPDATE annotated_assets SET
+			alias  = data->>'alias',
+			keys   = data->'keys',
+			quorum = (data->>'quorum')::integer,
+			tags   = data->'tags';
+		ALTER TABLE annotated_assets
+			ALTER COLUMN keys SET NOT NULL,
+			ALTER COLUMN quorum SET NOT NULL;
+	`},
 }

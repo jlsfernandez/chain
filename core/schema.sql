@@ -7,6 +7,7 @@
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SET check_function_bodies = false;
@@ -215,7 +216,11 @@ CREATE TABLE accounts (
 
 CREATE TABLE annotated_accounts (
     id text NOT NULL,
-    data jsonb NOT NULL
+    data jsonb NOT NULL,
+    alias text,
+    keys jsonb,
+    quorum integer,
+    tags jsonb
 );
 
 
@@ -226,7 +231,35 @@ CREATE TABLE annotated_accounts (
 CREATE TABLE annotated_assets (
     id bytea NOT NULL,
     data jsonb NOT NULL,
-    sort_id text NOT NULL
+    sort_id text NOT NULL,
+    alias text,
+    issuance_program bytea NOT NULL,
+    keys jsonb NOT NULL,
+    quorum integer NOT NULL,
+    definition jsonb,
+    tags jsonb,
+    local boolean NOT NULL
+);
+
+
+--
+-- Name: annotated_inputs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE annotated_inputs (
+    tx_hash bytea NOT NULL,
+    type text NOT NULL,
+    asset_id bytea NOT NULL,
+    asset_alias text,
+    asset_definition jsonb,
+    asset_tags jsonb,
+    asset_local boolean NOT NULL,
+    amount bigint NOT NULL,
+    account_id text NOT NULL,
+    account_alias text,
+    account_tags jsonb,
+    issuance_program bytea,
+    local boolean NOT NULL
 );
 
 
@@ -240,7 +273,21 @@ CREATE TABLE annotated_outputs (
     output_index integer NOT NULL,
     tx_hash bytea NOT NULL,
     data jsonb NOT NULL,
-    timespan int8range NOT NULL
+    timespan int8range NOT NULL,
+    type text NOT NULL,
+    purpose text NOT NULL,
+    asset_id bytea NOT NULL,
+    asset_alias text,
+    asset_definition jsonb NOT NULL,
+    asset_tags jsonb NOT NULL,
+    asset_local boolean NOT NULL,
+    amount bigint NOT NULL,
+    account_id text,
+    account_alias text,
+    account_tags jsonb,
+    control_program bytea NOT NULL,
+    reference_data jsonb NOT NULL,
+    local boolean NOT NULL
 );
 
 
@@ -252,7 +299,11 @@ CREATE TABLE annotated_txs (
     block_height bigint NOT NULL,
     tx_pos integer NOT NULL,
     tx_hash bytea NOT NULL,
-    data jsonb NOT NULL
+    data jsonb NOT NULL,
+    "timestamp" timestamp without time zone NOT NULL,
+    block_id bytea NOT NULL,
+    local boolean NOT NULL,
+    reference_data jsonb
 );
 
 
@@ -881,3 +932,4 @@ insert into migrations (filename, hash) values ('2017-01-10.0.signers.xpubs-type
 insert into migrations (filename, hash) values ('2017-01-11.0.core.hash-bytea.sql', '9f7f15df3479c38f193884a2d3cb7ae8001ed08607f9cc661fd5c420e248688d');
 insert into migrations (filename, hash) values ('2017-01-13.0.core.asset-definition-bytea.sql', 'f49458c5c8873d919ec35be4683074be0b04913c95f5ab1bf1402aa2b4847cf5');
 insert into migrations (filename, hash) values ('2017-01-19.0.asset.drop-mutable-flag.sql', '7850023d44c545c155c0ee372e7cdfef1859b40221bd94307b836503c26dd3de');
+insert into migrations (filename, hash) values ('2017-01-20.0.query.annotated-schema.sql', 'c9c879d8437e556931431d2294685410e7bfb89ec5c57cd4af1172c4f6219764');
