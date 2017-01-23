@@ -3,7 +3,6 @@ package query
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -14,18 +13,19 @@ import (
 
 // SaveAnnotatedAsset saves an annotated asset to the query indexes.
 func (ind *Indexer) SaveAnnotatedAsset(ctx context.Context, asset *AnnotatedAsset, sortID string) error {
-	b, err := json.Marshal(asset)
+	keysJSON, err := json.Marshal(asset.Keys)
 	if err != nil {
 		return errors.Wrap(err)
 	}
 
 	const q = `
 		INSERT INTO annotated_assets
-			(id, data, sort_id, alias, issuance_program, keys, quorum, definition, tags, local)
-		VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		ON CONFLICT (id) DO UPDATE SET data = $2, sort_id = $3, tags = $4
+			(id, sort_id, alias, issuance_program, keys, quorum, definition, tags, local)
+		VALUES($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9)
+		ON CONFLICT (id) DO UPDATE SET sort_id = $2, tags = $8::jsonb
 	`
-	_, err = ind.db.Exec(ctx, q, hex.EncodeToString(asset.ID), b, sortID)
+	_, err = ind.db.Exec(ctx, q, asset.ID, sortID, asset.Alias, asset.IssuanceProgram,
+		keysJSON, asset.Quorum, string(*asset.Definition), string(*asset.Tags), bool(asset.IsLocal))
 	return errors.Wrap(err, "saving annotated asset")
 }
 
@@ -48,19 +48,28 @@ func (ind *Indexer) Assets(ctx context.Context, p filter.Predicate, vals []inter
 
 	assets := make([]*AnnotatedAsset, 0, limit)
 	for rows.Next() {
-		var (
-			sortID   string
-			rawAsset []byte
+		aa := new(AnnotatedAsset)
+
+		var sortID string
+		var keysJSON []byte
+
+		err := rows.Scan(
+			&aa.ID,
+			&sortID,
+			&aa.Alias,
+			&aa.IssuanceProgram,
+			&keysJSON,
+			&aa.Quorum,
+			&aa.Definition,
+			&aa.Tags,
+			&aa.IsLocal,
 		)
-		err := rows.Scan(&sortID, &rawAsset)
 		if err != nil {
 			return nil, "", errors.Wrap(err, "scanning annotated asset row")
 		}
-
-		aa := new(AnnotatedAsset)
-		err = json.Unmarshal(rawAsset, aa)
+		err = json.Unmarshal(keysJSON, &aa.Keys)
 		if err != nil {
-			return nil, "", errors.Wrap(err, "unmarshaling raw asset")
+			return nil, "", errors.Wrap(err, "unmarshaling asset keys json")
 		}
 
 		after = sortID
@@ -77,7 +86,9 @@ func (ind *Indexer) Assets(ctx context.Context, p filter.Predicate, vals []inter
 func constructAssetsQuery(expr string, vals []interface{}, after string, limit int) (string, []interface{}) {
 	var buf bytes.Buffer
 
-	buf.WriteString("SELECT sort_id, data FROM annotated_assets")
+	buf.WriteString("SELECT ")
+	buf.WriteString("id, sort_id, alias, issuance_program, keys, quorum, definition, tags, local")
+	buf.WriteString(" FROM annotated_assets AS ast")
 	buf.WriteString(" WHERE ")
 
 	// add filter conditions
@@ -93,5 +104,6 @@ func constructAssetsQuery(expr string, vals []interface{}, after string, limit i
 
 	buf.WriteString("ORDER BY sort_id DESC ")
 	buf.WriteString("LIMIT " + strconv.Itoa(limit))
+
 	return buf.String(), vals
 }

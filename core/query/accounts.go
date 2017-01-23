@@ -13,16 +13,18 @@ import (
 
 // SaveAnnotatedAccount saves an annotated account to the query indexes.
 func (ind *Indexer) SaveAnnotatedAccount(ctx context.Context, account *AnnotatedAccount) error {
-	b, err := json.Marshal(account)
+	keysJSON, err := json.Marshal(account.Keys)
 	if err != nil {
 		return errors.Wrap(err)
 	}
 
 	const q = `
-		INSERT INTO annotated_accounts (id, data) VALUES($1, $2)
-		ON CONFLICT (id) DO UPDATE SET data = $2
+		INSERT INTO annotated_accounts (id, alias, keys, quorum, tags)
+		VALUES($1, $2, $3::jsonb, $4, $5::jsonb)
+		ON CONFLICT (id) DO UPDATE SET tags = $5::jsonb
 	`
-	_, err = ind.db.Exec(ctx, q, account.ID, b)
+	_, err = ind.db.Exec(ctx, q, account.ID, account.Alias, keysJSON,
+		account.Quorum, string(*account.Tags))
 	return errors.Wrap(err, "saving annotated account")
 }
 
@@ -45,20 +47,25 @@ func (ind *Indexer) Accounts(ctx context.Context, p filter.Predicate, vals []int
 
 	accounts := make([]*AnnotatedAccount, 0, limit)
 	for rows.Next() {
-		var accID string
-		var rawAccount []byte
-		err := rows.Scan(&accID, &rawAccount)
+		var keysJSON []byte
+		aa := new(AnnotatedAccount)
+
+		err := rows.Scan(
+			&aa.ID,
+			&aa.Alias,
+			&keysJSON,
+			&aa.Quorum,
+			&aa.Tags,
+		)
 		if err != nil {
 			return nil, "", errors.Wrap(err, "scanning account row")
 		}
-
-		aa := new(AnnotatedAccount)
-		err = json.Unmarshal(rawAccount, &aa)
+		err = json.Unmarshal(keysJSON, &aa.Keys)
 		if err != nil {
-			return nil, "", errors.Wrap(err, "unmarshaling annotated account")
+			return nil, "", errors.Wrap(err, "unmarshaling account keys json")
 		}
 
-		after = accID
+		after = aa.ID
 		accounts = append(accounts, aa)
 	}
 	return accounts, after, errors.Wrap(rows.Err())
@@ -67,7 +74,9 @@ func (ind *Indexer) Accounts(ctx context.Context, p filter.Predicate, vals []int
 func constructAccountsQuery(expr string, vals []interface{}, after string, limit int) (string, []interface{}) {
 	var buf bytes.Buffer
 
-	buf.WriteString("SELECT id, data FROM annotated_accounts")
+	buf.WriteString("SELECT ")
+	buf.WriteString("id, alias, keys, quorum, tags")
+	buf.WriteString(" FROM annotated_accounts AS acc")
 	buf.WriteString(" WHERE ")
 
 	// add filter conditions

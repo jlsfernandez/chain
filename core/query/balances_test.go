@@ -19,14 +19,14 @@ func TestConstructBalancesQuery(t *testing.T) {
 		{
 			predicate:  "account_id = 'abc'",
 			sumBy:      []string{"asset_id"},
-			wantQuery:  `SELECT COALESCE(SUM(amount), 0), out."asset_id" FROM "annotated_outputs" AS out WHERE (out."account_id" = 'abc') AND timespan @> $1::int8 GROUP BY 2`,
+			wantQuery:  `SELECT COALESCE(SUM(amount), 0), encode(out."asset_id", 'hex') FROM "annotated_outputs" AS out WHERE (out."account_id" = 'abc') AND timespan @> $1::int8 GROUP BY 2`,
 			wantValues: []interface{}{now},
 		},
 		{
 			predicate:  "account_id = $1",
 			sumBy:      []string{"asset_id"},
 			values:     []interface{}{"abc"},
-			wantQuery:  `SELECT COALESCE(SUM(amount), 0), out."asset_id" FROM "annotated_outputs" AS out WHERE (out."account_id" = $1) AND timespan @> $2::int8 GROUP BY 2`,
+			wantQuery:  `SELECT COALESCE(SUM(amount), 0), encode(out."asset_id", 'hex') FROM "annotated_outputs" AS out WHERE (out."account_id" = $1) AND timespan @> $2::int8 GROUP BY 2`,
 			wantValues: []interface{}{`abc`, now},
 		},
 		{

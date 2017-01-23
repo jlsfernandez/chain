@@ -50,7 +50,7 @@ func TestFieldAsSQL(t *testing.T) {
 		sql   string
 	}{
 		{tbl: inputsSQLTable, field: `a`, sql: `inp."a"`},
-		{tbl: inputsSQLTable, field: `asset_id`, sql: `inp."asset_id"`},
+		{tbl: inputsSQLTable, field: `asset_id`, sql: `encode(inp."asset_id", 'hex')`},
 		{tbl: transactionsSQLTable, field: `ref.buyer.address.state`, sql: `txs."ref"->'buyer'->'address'->>'state'`},
 	}
 

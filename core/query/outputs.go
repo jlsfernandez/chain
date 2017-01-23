@@ -3,7 +3,6 @@ package query
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 
@@ -70,26 +69,53 @@ func (ind *Indexer) Outputs(ctx context.Context, p filter.Predicate, vals []inte
 	outputs := make([]*AnnotatedOutput, 0, limit)
 	for rows.Next() {
 		var (
-			blockHeight uint64
-			txPos       uint32
-			index       uint32
-			data        []byte
+			blockHeight  uint64
+			txPos        uint32
+			assetAlias   *string
+			accountID    *string
+			accountAlias *string
+			out          = new(AnnotatedOutput)
 		)
-		err = rows.Scan(&blockHeight, &txPos, &index, &data)
+		err = rows.Scan(
+			&blockHeight,
+			&txPos,
+			&out.Position,
+			&out.TransactionID,
+			&out.Type,
+			&out.Purpose,
+			&out.AssetID,
+			&assetAlias,
+			&out.AssetDefinition,
+			&out.AssetTags,
+			&out.AssetIsLocal,
+			&out.Amount,
+			&accountID,
+			&accountAlias,
+			&out.AccountTags,
+			&out.ControlProgram,
+			&out.ReferenceData,
+			&out.IsLocal,
+		)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, errors.Wrap(err, "scanning annotated output")
 		}
 
-		out := new(AnnotatedOutput)
-		err = json.Unmarshal(data, out)
-		if err != nil {
-			return nil, nil, err
+		// Set nullable fields.
+		if assetAlias != nil {
+			out.AssetAlias = *assetAlias
 		}
+		if accountID != nil {
+			out.AccountID = *accountID
+		}
+		if accountAlias != nil {
+			out.AccountAlias = *accountAlias
+		}
+
 		outputs = append(outputs, out)
 
 		newAfter.lastBlockHeight = blockHeight
 		newAfter.lastTxPos = txPos
-		newAfter.lastIndex = index
+		newAfter.lastIndex = out.Position
 	}
 	err = rows.Err()
 	if err != nil {
@@ -102,7 +128,12 @@ func (ind *Indexer) Outputs(ctx context.Context, p filter.Predicate, vals []inte
 func constructOutputsQuery(where string, vals []interface{}, timestampMS uint64, after *OutputsAfter, limit int) (string, []interface{}) {
 	var buf bytes.Buffer
 
-	buf.WriteString("SELECT block_height, tx_pos, output_index, data FROM ")
+	buf.WriteString("SELECT ")
+	buf.WriteString("block_height, tx_pos, output_index, tx_hash, type, purpose, ")
+	buf.WriteString("asset_id, asset_alias, asset_definition, asset_tags, asset_local, ")
+	buf.WriteString("amount, account_id, account_alias, account_tags, control_program, ")
+	buf.WriteString("reference_data, local")
+	buf.WriteString(" FROM ")
 	buf.WriteString(pq.QuoteIdentifier("annotated_outputs"))
 	buf.WriteString(" AS out WHERE ")
 

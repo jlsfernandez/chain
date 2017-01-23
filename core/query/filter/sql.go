@@ -45,9 +45,16 @@ func FieldAsSQL(tbl *SQLTable, f Field) (string, error) {
 	}
 
 	var buf bytes.Buffer
+
+	if col.SQLType == SQLBytea {
+		buf.WriteString("encode(")
+	}
 	buf.WriteString(tbl.Alias)
 	buf.WriteRune('.')
 	buf.WriteString(pq.QuoteIdentifier(base))
+	if col.SQLType == SQLBytea {
+		buf.WriteString(", 'hex')")
+	}
 
 	for i, c := range rest {
 		if i == len(rest)-1 {

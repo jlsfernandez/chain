@@ -43,13 +43,13 @@ func TestOutputsAfter(t *testing.T) {
 	_, db := pgtest.NewDB(t, pgtest.SchemaPath)
 	ctx := context.Background()
 	_, err := db.Exec(ctx, `
-		INSERT INTO annotated_outputs (block_height, tx_pos, output_index, tx_hash, data, timespan,
+		INSERT INTO annotated_outputs (block_height, tx_pos, output_index, tx_hash, timespan,
 			type, purpose, asset_id, asset_definition, asset_local, asset_tags, amount, control_program, reference_data, local)
 		VALUES
-		(1, 0, 0, 'ab', '{"account_id": "abc"}', int8range(1, 100), 'control', 'receive', E'\\xDEADBEEF', '{}'::jsonb, true, '{}'::jsonb, 10, E'\\xDEADBEEF', '{}'::jsonb, true),
-		(1, 1, 0, 'cd', '{"account_id": "abc"}', int8range(1, 100), 'control', 'receive', E'\\xDEADBEEF', '{}'::jsonb, true, '{}'::jsonb, 10, E'\\xDEADBEEF', '{}'::jsonb, true),
-		(1, 1, 1, 'cd', '{"account_id": "abc"}', int8range(1, 100), 'control', 'receive', E'\\xDEADBEEF', '{}'::jsonb, true, '{}'::jsonb, 10, E'\\xDEADBEEF', '{}'::jsonb, true),
-		(2, 0, 0, 'ef', '{"account_id": "abc"}', int8range(10, 50), 'control', 'receive', E'\\xDEADBEEF', '{}'::jsonb, true, '{}'::jsonb, 10, E'\\xDEADBEEF', '{}'::jsonb, true);
+		(1, 0, 0, 'ab', int8range(1, 100), 'control', 'receive', E'\\xDEADBEEF', '{}'::jsonb, true, '{}'::jsonb, 10, E'\\xDEADBEEF', '{}'::jsonb, true),
+		(1, 1, 0, 'cd', int8range(1, 100), 'control', 'receive', E'\\xDEADBEEF', '{}'::jsonb, true, '{}'::jsonb, 10, E'\\xDEADBEEF', '{}'::jsonb, true),
+		(1, 1, 1, 'cd', int8range(1, 100), 'control', 'receive', E'\\xDEADBEEF', '{}'::jsonb, true, '{}'::jsonb, 10, E'\\xDEADBEEF', '{}'::jsonb, true),
+		(2, 0, 0, 'ef', int8range(10, 50), 'control', 'receive', E'\\xDEADBEEF', '{}'::jsonb, true, '{}'::jsonb, 10, E'\\xDEADBEEF', '{}'::jsonb, true);
 	`)
 	if err != nil {
 		t.Fatal(err)
@@ -96,13 +96,13 @@ func TestConstructOutputsQuery(t *testing.T) {
 	}{
 		{
 			// empty filter
-			wantQuery:  `SELECT block_height, tx_pos, output_index, data FROM "annotated_outputs" AS out WHERE timespan @> $1::int8 ORDER BY block_height DESC, tx_pos DESC, output_index DESC LIMIT 10`,
+			wantQuery:  `SELECT block_height, tx_pos, output_index, tx_hash, type, purpose, asset_id, asset_alias, asset_definition, asset_tags, asset_local, amount, account_id, account_alias, account_tags, control_program, reference_data, local FROM "annotated_outputs" AS out WHERE timespan @> $1::int8 ORDER BY block_height DESC, tx_pos DESC, output_index DESC LIMIT 10`,
 			wantValues: []interface{}{nowMillis},
 		},
 		{
 			filter:     "asset_id = $1 AND account_id = 'abc'",
 			values:     []interface{}{"foo"},
-			wantQuery:  `SELECT block_height, tx_pos, output_index, data FROM "annotated_outputs" AS out WHERE (encode(out."asset_id", 'hex') = $1 AND out."account_id" = 'abc') AND timespan @> $2::int8 ORDER BY block_height DESC, tx_pos DESC, output_index DESC LIMIT 10`,
+			wantQuery:  `SELECT block_height, tx_pos, output_index, tx_hash, type, purpose, asset_id, asset_alias, asset_definition, asset_tags, asset_local, amount, account_id, account_alias, account_tags, control_program, reference_data, local FROM "annotated_outputs" AS out WHERE (encode(out."asset_id", 'hex') = $1 AND out."account_id" = 'abc') AND timespan @> $2::int8 ORDER BY block_height DESC, tx_pos DESC, output_index DESC LIMIT 10`,
 			wantValues: []interface{}{`foo`, nowMillis},
 		},
 		{
@@ -113,7 +113,7 @@ func TestConstructOutputsQuery(t *testing.T) {
 				lastTxPos:       17,
 				lastIndex:       19,
 			},
-			wantQuery:  `SELECT block_height, tx_pos, output_index, data FROM "annotated_outputs" AS out WHERE (encode(out."asset_id", 'hex') = $1 AND out."account_id" = 'abc') AND timespan @> $2::int8 AND (block_height, tx_pos, output_index) < ($3, $4, $5) ORDER BY block_height DESC, tx_pos DESC, output_index DESC LIMIT 10`,
+			wantQuery:  `SELECT block_height, tx_pos, output_index, tx_hash, type, purpose, asset_id, asset_alias, asset_definition, asset_tags, asset_local, amount, account_id, account_alias, account_tags, control_program, reference_data, local FROM "annotated_outputs" AS out WHERE (encode(out."asset_id", 'hex') = $1 AND out."account_id" = 'abc') AND timespan @> $2::int8 AND (block_height, tx_pos, output_index) < ($3, $4, $5) ORDER BY block_height DESC, tx_pos DESC, output_index DESC LIMIT 10`,
 			wantValues: []interface{}{`foo`, nowMillis, uint64(15), uint32(17), uint32(19)},
 		},
 	}

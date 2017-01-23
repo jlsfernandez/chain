@@ -44,13 +44,16 @@ func (ind *Indexer) IndexTransactions(ctx context.Context, b *bc.Block) error {
 	if err != nil {
 		return err
 	}
-
 	txs, err := ind.insertAnnotatedTxs(ctx, b)
 	if err != nil {
 		return err
 	}
-
-	return ind.insertAnnotatedOutputs(ctx, b, txs)
+	err = ind.insertAnnotatedOutputs(ctx, b, txs)
+	if err != nil {
+		return err
+	}
+	err = ind.insertAnnotatedInputs(ctx, b, txs)
+	return err
 }
 
 func (ind *Indexer) insertBlock(ctx context.Context, b *bc.Block) error {
@@ -113,13 +116,73 @@ func (ind *Indexer) insertAnnotatedTxs(ctx context.Context, b *bc.Block) ([]*Ann
 	return annotatedTxs, nil
 }
 
+func (ind *Indexer) insertAnnotatedInputs(ctx context.Context, b *bc.Block, annotatedTxs []*AnnotatedTx) error {
+	var (
+		inputTxHashes         pq.ByteaArray
+		inputIndexes          pq.Int64Array
+		inputTypes            pq.StringArray
+		inputAssetIDs         pq.ByteaArray
+		inputAssetAliases     []sql.NullString
+		inputAssetDefinitions pq.StringArray
+		inputAssetTags        pq.StringArray
+		inputAssetLocals      pq.BoolArray
+		inputAmounts          pq.Int64Array
+		inputAccountIDs       []sql.NullString
+		inputAccountAliases   []sql.NullString
+		inputAccountTags      []sql.NullString
+		inputIssuancePrograms pq.ByteaArray
+		inputReferenceDatas   pq.StringArray
+		inputLocals           pq.BoolArray
+	)
+
+	for _, annotatedTx := range annotatedTxs {
+		for i, in := range annotatedTx.Inputs {
+			inputTxHashes = append(inputTxHashes, annotatedTx.ID)
+			inputIndexes = append(inputIndexes, int64(i))
+			inputTypes = append(inputTypes, in.Type)
+			inputAssetIDs = append(inputAssetIDs, in.AssetID)
+			inputAssetAliases = append(inputAssetAliases, sql.NullString{String: in.AssetAlias, Valid: len(in.AssetAlias) == 0})
+			inputAssetDefinitions = append(inputAssetDefinitions, string(*in.AssetDefinition))
+			inputAssetTags = append(inputAssetTags, string(*in.AssetTags))
+			inputAssetLocals = append(inputAssetLocals, bool(in.AssetIsLocal))
+			inputAmounts = append(inputAmounts, int64(in.Amount))
+			inputAccountIDs = append(inputAccountIDs, sql.NullString{String: in.AccountID, Valid: in.AccountID != ""})
+			inputAccountAliases = append(inputAccountAliases, sql.NullString{String: in.AccountAlias, Valid: in.AccountAlias != ""})
+			if in.AccountTags != nil {
+				inputAccountTags = append(inputAccountTags, sql.NullString{String: string(*in.AccountTags), Valid: true})
+			} else {
+				inputAccountTags = append(inputAccountTags, sql.NullString{})
+			}
+			inputIssuancePrograms = append(inputIssuancePrograms, in.IssuanceProgram)
+			inputReferenceDatas = append(inputReferenceDatas, string(*in.ReferenceData))
+			inputLocals = append(inputLocals, bool(in.IsLocal))
+		}
+	}
+	const insertQ = `
+		INSERT INTO annotated_inputs (tx_hash, index, type,
+			asset_id, asset_alias, asset_definition, asset_tags, asset_local,
+			amount, account_id, account_alias, account_tags, issuance_program,
+			reference_data, local)
+		SELECT unnest($1::bytea[]), unnest($2::integer[]), unnest($3::text[]), unnest($4::bytea[]),
+		unnest($5::text[]), unnest($6::jsonb[]), unnest($7::jsonb[]), unnest($8::boolean[]),
+		unnest($9::bigint[]), unnest($10::text[]), unnest($11::text[]), unnest($12::jsonb[]),
+		unnest($13::bytea[]), unnest($14::jsonb[]), unnest($15::boolean[])
+		ON CONFLICT (tx_hash, index) DO NOTHING;
+	`
+	_, err := ind.db.Exec(ctx, insertQ, inputTxHashes, inputIndexes, inputTypes, inputAssetIDs,
+		pq.Array(inputAssetAliases), inputAssetDefinitions, pq.Array(inputAssetTags), inputAssetLocals,
+		inputAmounts, pq.Array(inputAccountIDs), pq.Array(inputAccountAliases), pq.Array(inputAccountTags),
+		inputIssuancePrograms, inputReferenceDatas, inputLocals)
+	return errors.Wrap(err, "batch inserting annotated inputs")
+}
+
 func (ind *Indexer) insertAnnotatedOutputs(ctx context.Context, b *bc.Block, annotatedTxs []*AnnotatedTx) error {
 	var (
 		outputTxPositions      pg.Uint32s
 		outputIndexes          pg.Uint32s
 		outputTxHashes         pq.ByteaArray
 		outputTypes            pq.StringArray
-		outputPurposes         []sql.NullString
+		outputPurposes         pq.StringArray
 		outputAssetIDs         pq.ByteaArray
 		outputAssetAliases     []sql.NullString
 		outputAssetDefinitions pq.StringArray
@@ -132,7 +195,6 @@ func (ind *Indexer) insertAnnotatedOutputs(ctx context.Context, b *bc.Block, ann
 		outputControlPrograms  pq.ByteaArray
 		outputReferenceDatas   pq.StringArray
 		outputLocals           pq.BoolArray
-		outputDatas            pq.StringArray
 		prevoutHashes          pq.ByteaArray
 		prevoutIndexes         pg.Uint32s
 	)
@@ -153,16 +215,12 @@ func (ind *Indexer) insertAnnotatedOutputs(ctx context.Context, b *bc.Block, ann
 
 			outCopy := *out
 			outCopy.TransactionID = tx.Hash[:]
-			serializedData, err := json.Marshal(outCopy)
-			if err != nil {
-				return errors.Wrap(err, "serializing annotated output")
-			}
 
 			outputTxPositions = append(outputTxPositions, uint32(pos))
 			outputIndexes = append(outputIndexes, uint32(outIndex))
 			outputTxHashes = append(outputTxHashes, tx.Hash[:])
 			outputTypes = append(outputTypes, out.Type)
-			outputPurposes = append(outputPurposes, sql.NullString{String: out.Purpose, Valid: out.Purpose != ""})
+			outputPurposes = append(outputPurposes, out.Purpose)
 			outputAssetIDs = append(outputAssetIDs, out.AssetID)
 			outputAssetAliases = append(outputAssetAliases, sql.NullString{String: out.AssetAlias, Valid: out.AssetAlias != ""})
 			outputAssetDefinitions = append(outputAssetDefinitions, string(*out.AssetDefinition))
@@ -179,26 +237,25 @@ func (ind *Indexer) insertAnnotatedOutputs(ctx context.Context, b *bc.Block, ann
 			outputControlPrograms = append(outputControlPrograms, out.ControlProgram)
 			outputReferenceDatas = append(outputReferenceDatas, string(*out.ReferenceData))
 			outputLocals = append(outputLocals, bool(out.IsLocal))
-			outputDatas = append(outputDatas, string(serializedData))
 		}
 	}
 
 	// Insert all of the block's outputs at once.
 	const insertQ = `
 		INSERT INTO annotated_outputs (block_height, tx_pos, output_index, tx_hash,
-			data, timespan, type, purpose, asset_id, asset_alias, asset_definition,
+			timespan, type, purpose, asset_id, asset_alias, asset_definition,
 			asset_tags, asset_local, amount, account_id, account_alias, account_tags,
 			control_program, reference_data, local)
 		SELECT $1, unnest($2::integer[]), unnest($3::integer[]), unnest($4::bytea[]),
-		unnest($5::jsonb[]), int8range($6, NULL), unnest($7::text[]), unnest($8::bytea[]),
-		unnest($9::bytea[]), unnest($10::text[]), unnest($11::jsonb[]), unnest($12::jsonb[]),
-		unnest($13::boolean[]), unnest($14::bigint[]), unnest($15::text[]), unnest($16::text[]),
-		unnest($17::jsonb[]), unnest($18::bytea[]), unnest($19::jsonb[]), unnest($20::boolean[])
+		int8range($5, NULL), unnest($6::text[]), unnest($7::text[]),
+		unnest($8::bytea[]), unnest($9::text[]), unnest($10::jsonb[]), unnest($11::jsonb[]),
+		unnest($12::boolean[]), unnest($13::bigint[]), unnest($14::text[]), unnest($15::text[]),
+		unnest($16::jsonb[]), unnest($17::bytea[]), unnest($18::jsonb[]), unnest($19::boolean[])
 		ON CONFLICT (block_height, tx_pos, output_index) DO NOTHING;
 	`
 	_, err := ind.db.Exec(ctx, insertQ, b.Height, outputTxPositions,
-		outputIndexes, outputTxHashes, outputDatas, b.TimestampMS, outputTypes,
-		pq.Array(outputPurposes), outputAssetIDs, pq.Array(outputAssetAliases),
+		outputIndexes, outputTxHashes, b.TimestampMS, outputTypes,
+		outputPurposes, outputAssetIDs, pq.Array(outputAssetAliases),
 		outputAssetDefinitions, outputAssetTags, outputAssetLocals,
 		outputAmounts, pq.Array(outputAccountIDs), pq.Array(outputAccountAliases),
 		pq.Array(outputAccountTags), outputControlPrograms, outputReferenceDatas,

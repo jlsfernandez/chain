@@ -216,10 +216,9 @@ CREATE TABLE accounts (
 
 CREATE TABLE annotated_accounts (
     id text NOT NULL,
-    data jsonb NOT NULL,
     alias text,
-    keys jsonb,
-    quorum integer,
+    keys jsonb NOT NULL,
+    quorum integer NOT NULL,
     tags jsonb
 );
 
@@ -230,7 +229,6 @@ CREATE TABLE annotated_accounts (
 
 CREATE TABLE annotated_assets (
     id bytea NOT NULL,
-    data jsonb NOT NULL,
     sort_id text NOT NULL,
     alias text,
     issuance_program bytea NOT NULL,
@@ -248,6 +246,7 @@ CREATE TABLE annotated_assets (
 
 CREATE TABLE annotated_inputs (
     tx_hash bytea NOT NULL,
+    index integer NOT NULL,
     type text NOT NULL,
     asset_id bytea NOT NULL,
     asset_alias text,
@@ -255,10 +254,11 @@ CREATE TABLE annotated_inputs (
     asset_tags jsonb,
     asset_local boolean NOT NULL,
     amount bigint NOT NULL,
-    account_id text NOT NULL,
+    account_id text,
     account_alias text,
     account_tags jsonb,
     issuance_program bytea,
+    reference_data jsonb,
     local boolean NOT NULL
 );
 
@@ -272,7 +272,6 @@ CREATE TABLE annotated_outputs (
     tx_pos integer NOT NULL,
     output_index integer NOT NULL,
     tx_hash bytea NOT NULL,
-    data jsonb NOT NULL,
     timespan int8range NOT NULL,
     type text NOT NULL,
     purpose text NOT NULL,
@@ -637,6 +636,14 @@ ALTER TABLE ONLY annotated_assets
 
 
 --
+-- Name: annotated_inputs annotated_inputs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY annotated_inputs
+    ADD CONSTRAINT annotated_inputs_pkey PRIMARY KEY (tx_hash, index);
+
+
+--
 -- Name: annotated_outputs annotated_outputs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -836,31 +843,10 @@ CREATE INDEX account_utxos_asset_id_account_id_confirmed_in_idx ON account_utxos
 
 
 --
--- Name: annotated_accounts_jsondata_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX annotated_accounts_jsondata_idx ON annotated_accounts USING gin (data jsonb_path_ops);
-
-
---
--- Name: annotated_assets_jsondata_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX annotated_assets_jsondata_idx ON annotated_assets USING gin (data jsonb_path_ops);
-
-
---
 -- Name: annotated_assets_sort_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX annotated_assets_sort_id ON annotated_assets USING btree (sort_id);
-
-
---
--- Name: annotated_outputs_jsondata_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX annotated_outputs_jsondata_idx ON annotated_outputs USING gin (data jsonb_path_ops);
 
 
 --
@@ -932,4 +918,4 @@ insert into migrations (filename, hash) values ('2017-01-10.0.signers.xpubs-type
 insert into migrations (filename, hash) values ('2017-01-11.0.core.hash-bytea.sql', '9f7f15df3479c38f193884a2d3cb7ae8001ed08607f9cc661fd5c420e248688d');
 insert into migrations (filename, hash) values ('2017-01-13.0.core.asset-definition-bytea.sql', 'f49458c5c8873d919ec35be4683074be0b04913c95f5ab1bf1402aa2b4847cf5');
 insert into migrations (filename, hash) values ('2017-01-19.0.asset.drop-mutable-flag.sql', '7850023d44c545c155c0ee372e7cdfef1859b40221bd94307b836503c26dd3de');
-insert into migrations (filename, hash) values ('2017-01-20.0.query.annotated-schema.sql', 'c9c879d8437e556931431d2294685410e7bfb89ec5c57cd4af1172c4f6219764');
+insert into migrations (filename, hash) values ('2017-01-23.0.query.annotated-schema.sql', '04b3f91b4ded2d19cf4f2e53d4acf51373ad7fa60069254099c579959038b253');

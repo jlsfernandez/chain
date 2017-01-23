@@ -107,7 +107,7 @@ var migrations = []migration{
 	{Name: "2017-01-19.0.asset.drop-mutable-flag.sql", SQL: `
 		ALTER TABLE assets DROP COLUMN definition_mutable;
 	`},
-	{Name: "2017-01-20.0.query.annotated-schema.sql", SQL: `
+	{Name: "2017-01-23.0.query.annotated-schema.sql", SQL: `
 		--
 		-- Flatten annotated_outputs into schema
 		--
@@ -149,7 +149,8 @@ var migrations = []migration{
 			ALTER COLUMN asset_local SET NOT NULL,
 			ALTER COLUMN amount SET NOT NULL,
 			ALTER COLUMN control_program SET NOT NULL,
-			ALTER COLUMN local SET NOT NULL;
+			ALTER COLUMN local SET NOT NULL,
+			DROP COLUMN data;
 
 		--
 		-- Flatten annotated_txs into schema
@@ -174,6 +175,7 @@ var migrations = []migration{
 		--
 		CREATE TABLE annotated_inputs (
 			tx_hash          bytea NOT NULL,
+			index            int NOT NULL,
 			type             text NOT NULL,
 			asset_id         bytea NOT NULL,
 			asset_alias      text,
@@ -181,11 +183,13 @@ var migrations = []migration{
 			asset_tags       jsonb,
 			asset_local      boolean NOT NULL,
 			amount           bigint NOT NULL,
-			account_id       text NOT NULL,
+			account_id       text,
 			account_alias    text,
 			account_tags     jsonb,
 			issuance_program bytea,
-			local            boolean NOT NULL
+			reference_data   jsonb,
+			local            boolean NOT NULL,
+			PRIMARY KEY(tx_hash, index)
 		);
 
 		--
@@ -211,7 +215,8 @@ var migrations = []migration{
 			ALTER COLUMN issuance_program SET NOT NULL,
 			ALTER COLUMN keys SET NOT NULL,
 			ALTER COLUMN quorum SET NOT NULL,
-			ALTER COLUMN local SET NOT NULL;
+			ALTER COLUMN local SET NOT NULL,
+			DROP COLUMN data;
 
 		--
 		-- Flatten annotated_accounts into schema.
@@ -221,13 +226,14 @@ var migrations = []migration{
 			ADD COLUMN keys jsonb,
 			ADD COLUMN quorum integer,
 			ADD COLUMN tags jsonb;
-		UPDATE annotated_assets SET
+		UPDATE annotated_accounts SET
 			alias  = data->>'alias',
 			keys   = data->'keys',
 			quorum = (data->>'quorum')::integer,
 			tags   = data->'tags';
-		ALTER TABLE annotated_assets
+		ALTER TABLE annotated_accounts
 			ALTER COLUMN keys SET NOT NULL,
-			ALTER COLUMN quorum SET NOT NULL;
+			ALTER COLUMN quorum SET NOT NULL,
+			DROP COLUMN data;
 	`},
 }

@@ -105,18 +105,18 @@ func constructTransactionsQuery(expr string, vals []interface{}, after TxAfter, 
 
 	if asc {
 		// add time range & after conditions
-		buf.WriteString(fmt.Sprintf("(block_height, tx_pos) > ($%d, $%d) AND ", len(vals)+1, len(vals)+2))
-		buf.WriteString(fmt.Sprintf("block_height <= $%d ", len(vals)+3))
+		buf.WriteString(fmt.Sprintf("(txs.block_height, txs.tx_pos) > ($%d, $%d) AND ", len(vals)+1, len(vals)+2))
+		buf.WriteString(fmt.Sprintf("txs.block_height <= $%d ", len(vals)+3))
 		vals = append(vals, after.FromBlockHeight, after.FromPosition, after.StopBlockHeight)
 
-		buf.WriteString("ORDER BY block_height ASC, tx_pos ASC ")
+		buf.WriteString("ORDER BY txs.block_height ASC, txs.tx_pos ASC ")
 	} else {
 		// add time range & after conditions
-		buf.WriteString(fmt.Sprintf("(block_height, tx_pos) < ($%d, $%d) AND ", len(vals)+1, len(vals)+2))
-		buf.WriteString(fmt.Sprintf("block_height >= $%d ", len(vals)+3))
+		buf.WriteString(fmt.Sprintf("(txs.block_height, txs.tx_pos) < ($%d, $%d) AND ", len(vals)+1, len(vals)+2))
+		buf.WriteString(fmt.Sprintf("txs.block_height >= $%d ", len(vals)+3))
 		vals = append(vals, after.FromBlockHeight, after.FromPosition, after.StopBlockHeight)
 
-		buf.WriteString("ORDER BY block_height DESC, tx_pos DESC ")
+		buf.WriteString("ORDER BY txs.block_height DESC, txs.tx_pos DESC ")
 	}
 
 	buf.WriteString("LIMIT " + strconv.Itoa(limit))

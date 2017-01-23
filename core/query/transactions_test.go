@@ -81,7 +81,7 @@ func TestConstructTransactionsQuery(t *testing.T) {
 			asc:    false,
 			wantQuery: `SELECT block_height, tx_pos, data FROM annotated_txs AS txs WHERE 
 EXISTS(SELECT 1 FROM annotated_inputs AS inp WHERE inp."tx_hash" = txs."tx_hash" AND (inp."type" = 'issue' AND encode(inp."asset_id", 'hex') = $1))
- AND (block_height, tx_pos) < ($2, $3) AND block_height >= $4 ORDER BY block_height DESC, tx_pos DESC LIMIT 100`,
+ AND (txs.block_height, txs.tx_pos) < ($2, $3) AND txs.block_height >= $4 ORDER BY txs.block_height DESC, txs.tx_pos DESC LIMIT 100`,
 			wantValues: []interface{}{
 				`abc`, uint64(205), uint32(35), uint64(100),
 			},
@@ -93,7 +93,7 @@ EXISTS(SELECT 1 FROM annotated_inputs AS inp WHERE inp."tx_hash" = txs."tx_hash"
 			asc:    false,
 			wantQuery: `SELECT block_height, tx_pos, data FROM annotated_txs AS txs WHERE 
 EXISTS(SELECT 1 FROM annotated_outputs AS out WHERE out."tx_hash" = txs."tx_hash" AND (out."account_id" = $1 OR out."reference_data"->>'corporate' = $2))
- AND (block_height, tx_pos) < ($3, $4) AND block_height >= $5 ORDER BY block_height DESC, tx_pos DESC LIMIT 100`,
+ AND (txs.block_height, txs.tx_pos) < ($3, $4) AND txs.block_height >= $5 ORDER BY txs.block_height DESC, txs.tx_pos DESC LIMIT 100`,
 			wantValues: []interface{}{
 				`acc123`, `corp`, uint64(2), uint32(20), uint64(1),
 			},
@@ -105,7 +105,7 @@ EXISTS(SELECT 1 FROM annotated_outputs AS out WHERE out."tx_hash" = txs."tx_hash
 			asc:    true,
 			wantQuery: `SELECT block_height, tx_pos, data FROM annotated_txs AS txs WHERE 
 EXISTS(SELECT 1 FROM annotated_outputs AS out WHERE out."tx_hash" = txs."tx_hash" AND (out."account_id" = $1 OR out."reference_data"->>'corporate' = $2))
- AND (block_height, tx_pos) > ($3, $4) AND block_height <= $5 ORDER BY block_height ASC, tx_pos ASC LIMIT 100`,
+ AND (txs.block_height, txs.tx_pos) > ($3, $4) AND txs.block_height <= $5 ORDER BY txs.block_height ASC, txs.tx_pos ASC LIMIT 100`,
 			wantValues: []interface{}{
 				`acc123`, `corp`, uint64(2), uint32(20), uint64(1),
 			},
