@@ -24,7 +24,7 @@ func (ind *Indexer) SaveAnnotatedAsset(ctx context.Context, asset *AnnotatedAsse
 		VALUES($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9)
 		ON CONFLICT (id) DO UPDATE SET sort_id = $2, tags = $8::jsonb
 	`
-	_, err = ind.db.Exec(ctx, q, asset.ID, sortID, asset.Alias, asset.IssuanceProgram,
+	_, err = ind.db.Exec(ctx, q, asset.ID[:], sortID, asset.Alias, asset.IssuanceProgram[:],
 		keysJSON, asset.Quorum, string(*asset.Definition), string(*asset.Tags), bool(asset.IsLocal))
 	return errors.Wrap(err, "saving annotated asset")
 }
