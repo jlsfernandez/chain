@@ -112,19 +112,19 @@ var migrations = []migration{
 		-- Flatten annotated_outputs into schema
 		--
 		ALTER TABLE annotated_outputs
-			ADD COLUMN type text NOT NULL,
-			ADD COLUMN purpose text NOT NULL,
-			ADD COLUMN asset_id bytea NOT NULL,
+			ADD COLUMN type text,
+			ADD COLUMN purpose text,
+			ADD COLUMN asset_id bytea,
 			ADD COLUMN asset_alias text,
 			ADD COLUMN asset_definition jsonb,
 			ADD COLUMN asset_tags jsonb,
-			ADD COLUMN asset_local boolean NOT NULL,
-			ADD COLUMN amount bigint NOT NULL,
+			ADD COLUMN asset_local boolean,
+			ADD COLUMN amount bigint,
 			ADD COLUMN account_id text,
 			ADD COLUMN account_alias text,
 			ADD COLUMN account_tags jsonb,
-			ADD COLUMN control_program bytea NOT NULL,
-			ADD COLUMN reference_data jsonb NOT NULL,
+			ADD COLUMN control_program bytea,
+			ADD COLUMN reference_data jsonb,
 			ADD COLUMN local boolean NOT NULL;
 		UPDATE annotated_outputs SET
 			type             = data->>'type',
@@ -143,12 +143,14 @@ var migrations = []migration{
 			local            = (data->>'is_local' = 'yes');
 		ALTER TABLE annotated_outputs
 			ALTER COLUMN type SET NOT NULL,
+			ALTER COLUMN purpose SET NOT NULL,
 			ALTER COLUMN asset_id SET NOT NULL,
 			ALTER COLUMN asset_definition SET NOT NULL,
 			ALTER COLUMN asset_tags SET NOT NULL,
 			ALTER COLUMN asset_local SET NOT NULL,
 			ALTER COLUMN amount SET NOT NULL,
 			ALTER COLUMN control_program SET NOT NULL,
+			ALTER COLUMN reference_data SET NOT NULL,
 			ALTER COLUMN local SET NOT NULL,
 			DROP COLUMN data;
 
@@ -168,7 +170,8 @@ var migrations = []migration{
 		ALTER TABLE annotated_txs
 			ALTER COLUMN timestamp SET NOT NULL,
 			ALTER COLUMN block_id SET NOT NULL,
-			ALTER COLUMN local SET NOT NULL;
+			ALTER COLUMN local SET NOT NULL,
+			ALTER COLUMN reference_data SET NOT NULL;
 
 		--
 		-- Introduce annotated_inputs
@@ -178,16 +181,16 @@ var migrations = []migration{
 			index            int NOT NULL,
 			type             text NOT NULL,
 			asset_id         bytea NOT NULL,
-			asset_alias      text,
-			asset_definition jsonb,
-			asset_tags       jsonb,
+			asset_alias      text NOT NULL,
+			asset_definition jsonb NOT NULL,
+			asset_tags       jsonb NOT NULL,
 			asset_local      boolean NOT NULL,
 			amount           bigint NOT NULL,
 			account_id       text,
 			account_alias    text,
 			account_tags     jsonb,
-			issuance_program bytea,
-			reference_data   jsonb,
+			issuance_program bytea NOT NULL,
+			reference_data   jsonb NOT NULL,
 			local            boolean NOT NULL,
 			PRIMARY KEY(tx_hash, index)
 		);
@@ -215,6 +218,8 @@ var migrations = []migration{
 			ALTER COLUMN issuance_program SET NOT NULL,
 			ALTER COLUMN keys SET NOT NULL,
 			ALTER COLUMN quorum SET NOT NULL,
+			ALTER COLUMN definition SET NOT NULL,
+			ALTER COLUMN tags SET NOT NULL,
 			ALTER COLUMN local SET NOT NULL,
 			DROP COLUMN data;
 
@@ -234,6 +239,7 @@ var migrations = []migration{
 		ALTER TABLE annotated_accounts
 			ALTER COLUMN keys SET NOT NULL,
 			ALTER COLUMN quorum SET NOT NULL,
+			ALTER COLUMN tags SET NOT NULL,
 			DROP COLUMN data;
 	`},
 }

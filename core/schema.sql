@@ -219,7 +219,7 @@ CREATE TABLE annotated_accounts (
     alias text,
     keys jsonb NOT NULL,
     quorum integer NOT NULL,
-    tags jsonb
+    tags jsonb NOT NULL
 );
 
 
@@ -234,8 +234,8 @@ CREATE TABLE annotated_assets (
     issuance_program bytea NOT NULL,
     keys jsonb NOT NULL,
     quorum integer NOT NULL,
-    definition jsonb,
-    tags jsonb,
+    definition jsonb NOT NULL,
+    tags jsonb NOT NULL,
     local boolean NOT NULL
 );
 
@@ -249,16 +249,16 @@ CREATE TABLE annotated_inputs (
     index integer NOT NULL,
     type text NOT NULL,
     asset_id bytea NOT NULL,
-    asset_alias text,
-    asset_definition jsonb,
-    asset_tags jsonb,
+    asset_alias text NOT NULL,
+    asset_definition jsonb NOT NULL,
+    asset_tags jsonb NOT NULL,
     asset_local boolean NOT NULL,
     amount bigint NOT NULL,
     account_id text,
     account_alias text,
     account_tags jsonb,
-    issuance_program bytea,
-    reference_data jsonb,
+    issuance_program bytea NOT NULL,
+    reference_data jsonb NOT NULL,
     local boolean NOT NULL
 );
 
@@ -302,7 +302,7 @@ CREATE TABLE annotated_txs (
     "timestamp" timestamp without time zone NOT NULL,
     block_id bytea NOT NULL,
     local boolean NOT NULL,
-    reference_data jsonb
+    reference_data jsonb NOT NULL
 );
 
 
@@ -918,4 +918,4 @@ insert into migrations (filename, hash) values ('2017-01-10.0.signers.xpubs-type
 insert into migrations (filename, hash) values ('2017-01-11.0.core.hash-bytea.sql', '9f7f15df3479c38f193884a2d3cb7ae8001ed08607f9cc661fd5c420e248688d');
 insert into migrations (filename, hash) values ('2017-01-13.0.core.asset-definition-bytea.sql', 'f49458c5c8873d919ec35be4683074be0b04913c95f5ab1bf1402aa2b4847cf5');
 insert into migrations (filename, hash) values ('2017-01-19.0.asset.drop-mutable-flag.sql', '7850023d44c545c155c0ee372e7cdfef1859b40221bd94307b836503c26dd3de');
-insert into migrations (filename, hash) values ('2017-01-23.0.query.annotated-schema.sql', '04b3f91b4ded2d19cf4f2e53d4acf51373ad7fa60069254099c579959038b253');
+insert into migrations (filename, hash) values ('2017-01-23.0.query.annotated-schema.sql', '4a8d89ecf8a008dd35bb956587127c0becce5ffb75976c50b9a767058b18f4b9');
