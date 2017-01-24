@@ -117,12 +117,10 @@ func (b *Bool) UnmarshalJSON(raw []byte) error {
 	return nil
 }
 
+var emptyJSONObject = json.RawMessage(`{}`)
+
 func buildAnnotatedTransaction(orig *bc.Tx, b *bc.Block, indexInBlock uint32) *AnnotatedTx {
 	blockHash := b.Hash()
-	referenceData := json.RawMessage(orig.ReferenceData)
-	if len(referenceData) == 0 {
-		referenceData = []byte(`{}`)
-	}
 
 	tx := &AnnotatedTx{
 		ID:            orig.Hash[:],
@@ -130,10 +128,15 @@ func buildAnnotatedTransaction(orig *bc.Tx, b *bc.Block, indexInBlock uint32) *A
 		BlockID:       blockHash[:],
 		BlockHeight:   b.Height,
 		Position:      indexInBlock,
-		ReferenceData: &referenceData,
+		ReferenceData: &emptyJSONObject,
 		Inputs:        make([]*AnnotatedInput, 0, len(orig.Inputs)),
 		Outputs:       make([]*AnnotatedOutput, 0, len(orig.Outputs)),
 	}
+	referenceData := json.RawMessage(orig.ReferenceData)
+	if len(referenceData) > 0 {
+		tx.ReferenceData = &referenceData
+	}
+
 	for _, in := range orig.Inputs {
 		tx.Inputs = append(tx.Inputs, buildAnnotatedInput(in))
 	}
@@ -146,14 +149,17 @@ func buildAnnotatedTransaction(orig *bc.Tx, b *bc.Block, indexInBlock uint32) *A
 func buildAnnotatedInput(orig *bc.TxInput) *AnnotatedInput {
 	aid := orig.AssetID()
 
-	referenceData := json.RawMessage(orig.ReferenceData)
-	if len(referenceData) == 0 {
-		referenceData = []byte(`{}`)
-	}
 	in := &AnnotatedInput{
-		AssetID:       aid[:],
-		Amount:        orig.Amount(),
-		ReferenceData: &referenceData,
+		AssetID:         aid[:],
+		Amount:          orig.Amount(),
+		AssetDefinition: &emptyJSONObject,
+		AssetTags:       &emptyJSONObject,
+		ReferenceData:   &emptyJSONObject,
+	}
+
+	referenceData := json.RawMessage(orig.ReferenceData)
+	if len(referenceData) > 0 {
+		in.ReferenceData = &referenceData
 	}
 
 	if orig.IsIssuance() {
@@ -174,16 +180,18 @@ func buildAnnotatedInput(orig *bc.TxInput) *AnnotatedInput {
 }
 
 func buildAnnotatedOutput(orig *bc.TxOutput, idx uint32) *AnnotatedOutput {
-	referenceData := json.RawMessage(orig.ReferenceData)
-	if len(referenceData) == 0 {
-		referenceData = []byte(`{}`)
-	}
 	out := &AnnotatedOutput{
-		Position:       idx,
-		AssetID:        orig.AssetID[:],
-		Amount:         orig.Amount,
-		ControlProgram: orig.ControlProgram,
-		ReferenceData:  &referenceData,
+		Position:        idx,
+		AssetID:         orig.AssetID[:],
+		AssetDefinition: &emptyJSONObject,
+		AssetTags:       &emptyJSONObject,
+		Amount:          orig.Amount,
+		ControlProgram:  orig.ControlProgram,
+		ReferenceData:   &emptyJSONObject,
+	}
+	referenceData := json.RawMessage(orig.ReferenceData)
+	if len(referenceData) > 0 {
+		out.ReferenceData = &referenceData
 	}
 	if vmutil.IsUnspendable(out.ControlProgram) {
 		out.Type = "retire"

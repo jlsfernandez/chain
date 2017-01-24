@@ -19,6 +19,8 @@ import (
 // the account block processor.
 const PinName = "account"
 
+var emptyJSONObject = json.RawMessage(`{}`)
+
 // A Saver is responsible for saving an annotated account object.
 // for indexing and retrieval.
 // If the Core is configured not to provide search services,
@@ -36,14 +38,17 @@ func (m *Manager) indexAnnotatedAccount(ctx context.Context, a *Account) error {
 		ID:     a.ID,
 		Alias:  a.Alias,
 		Quorum: a.Quorum,
+		Tags:   &emptyJSONObject,
 	}
 
 	tags, err := json.Marshal(a.Tags)
 	if err != nil {
 		return err
 	}
-	rawTags := json.RawMessage(tags)
-	aa.Tags = &rawTags
+	if len(tags) > 0 {
+		rawTags := json.RawMessage(tags)
+		aa.Tags = &rawTags
+	}
 
 	path := signers.Path(a.Signer, signers.AccountKeySpace)
 	var jsonPath []chainjson.HexBytes

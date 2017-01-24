@@ -122,7 +122,7 @@ func (ind *Indexer) insertAnnotatedInputs(ctx context.Context, b *bc.Block, anno
 		inputIndexes          pq.Int64Array
 		inputTypes            pq.StringArray
 		inputAssetIDs         pq.ByteaArray
-		inputAssetAliases     []sql.NullString
+		inputAssetAliases     pq.StringArray
 		inputAssetDefinitions pq.StringArray
 		inputAssetTags        pq.StringArray
 		inputAssetLocals      pq.BoolArray
@@ -141,7 +141,7 @@ func (ind *Indexer) insertAnnotatedInputs(ctx context.Context, b *bc.Block, anno
 			inputIndexes = append(inputIndexes, int64(i))
 			inputTypes = append(inputTypes, in.Type)
 			inputAssetIDs = append(inputAssetIDs, in.AssetID)
-			inputAssetAliases = append(inputAssetAliases, sql.NullString{String: in.AssetAlias, Valid: len(in.AssetAlias) == 0})
+			inputAssetAliases = append(inputAssetAliases, in.AssetAlias)
 			inputAssetDefinitions = append(inputAssetDefinitions, string(*in.AssetDefinition))
 			inputAssetTags = append(inputAssetTags, string(*in.AssetTags))
 			inputAssetLocals = append(inputAssetLocals, bool(in.AssetIsLocal))
@@ -170,7 +170,7 @@ func (ind *Indexer) insertAnnotatedInputs(ctx context.Context, b *bc.Block, anno
 		ON CONFLICT (tx_hash, index) DO NOTHING;
 	`
 	_, err := ind.db.Exec(ctx, insertQ, inputTxHashes, inputIndexes, inputTypes, inputAssetIDs,
-		pq.Array(inputAssetAliases), inputAssetDefinitions, pq.Array(inputAssetTags), inputAssetLocals,
+		inputAssetAliases, inputAssetDefinitions, pq.Array(inputAssetTags), inputAssetLocals,
 		inputAmounts, pq.Array(inputAccountIDs), pq.Array(inputAccountAliases), pq.Array(inputAccountTags),
 		inputIssuancePrograms, inputReferenceDatas, inputLocals)
 	return errors.Wrap(err, "batch inserting annotated inputs")
@@ -184,7 +184,7 @@ func (ind *Indexer) insertAnnotatedOutputs(ctx context.Context, b *bc.Block, ann
 		outputTypes            pq.StringArray
 		outputPurposes         pq.StringArray
 		outputAssetIDs         pq.ByteaArray
-		outputAssetAliases     []sql.NullString
+		outputAssetAliases     pq.StringArray
 		outputAssetDefinitions pq.StringArray
 		outputAssetTags        pq.StringArray
 		outputAssetLocals      pq.BoolArray
@@ -222,7 +222,7 @@ func (ind *Indexer) insertAnnotatedOutputs(ctx context.Context, b *bc.Block, ann
 			outputTypes = append(outputTypes, out.Type)
 			outputPurposes = append(outputPurposes, out.Purpose)
 			outputAssetIDs = append(outputAssetIDs, out.AssetID)
-			outputAssetAliases = append(outputAssetAliases, sql.NullString{String: out.AssetAlias, Valid: out.AssetAlias != ""})
+			outputAssetAliases = append(outputAssetAliases, out.AssetAlias)
 			outputAssetDefinitions = append(outputAssetDefinitions, string(*out.AssetDefinition))
 			outputAssetTags = append(outputAssetTags, string(*out.AssetTags))
 			outputAssetLocals = append(outputAssetLocals, bool(out.AssetIsLocal))
@@ -255,7 +255,7 @@ func (ind *Indexer) insertAnnotatedOutputs(ctx context.Context, b *bc.Block, ann
 	`
 	_, err := ind.db.Exec(ctx, insertQ, b.Height, outputTxPositions,
 		outputIndexes, outputTxHashes, b.TimestampMS, outputTypes,
-		outputPurposes, outputAssetIDs, pq.Array(outputAssetAliases),
+		outputPurposes, outputAssetIDs, outputAssetAliases,
 		outputAssetDefinitions, outputAssetTags, outputAssetLocals,
 		outputAmounts, pq.Array(outputAccountIDs), pq.Array(outputAccountAliases),
 		pq.Array(outputAccountTags), outputControlPrograms, outputReferenceDatas,

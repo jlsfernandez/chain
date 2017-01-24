@@ -3,6 +3,7 @@ package query
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -17,13 +18,14 @@ func (ind *Indexer) SaveAnnotatedAccount(ctx context.Context, account *Annotated
 	if err != nil {
 		return errors.Wrap(err)
 	}
+	alias := sql.NullString{String: account.Alias, Valid: account.Alias != ""}
 
 	const q = `
 		INSERT INTO annotated_accounts (id, alias, keys, quorum, tags)
 		VALUES($1, $2, $3::jsonb, $4, $5::jsonb)
 		ON CONFLICT (id) DO UPDATE SET tags = $5::jsonb
 	`
-	_, err = ind.db.Exec(ctx, q, []byte(account.ID), account.Alias, keysJSON,
+	_, err = ind.db.Exec(ctx, q, []byte(account.ID), alias, keysJSON,
 		account.Quorum, string(*account.Tags))
 	return errors.Wrap(err, "saving annotated account")
 }
