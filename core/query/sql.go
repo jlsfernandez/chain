@@ -64,6 +64,7 @@ var (
 			"account_alias":    {Name: "account_alias", Type: filter.String, SQLType: filter.SQLText},
 			"account_tags":     {Name: "account_tags", Type: filter.Object, SQLType: filter.SQLJSONB},
 			"issuance_program": {Name: "issuance_program", Type: filter.String, SQLType: filter.SQLBytea},
+			"reference_data":   {Name: "reference_data", Type: filter.Object, SQLType: filter.SQLJSONB},
 			"is_local":         {Name: "local", Type: filter.Bool, SQLType: filter.SQLBool},
 			// TODO(jackson): moar?
 		},
