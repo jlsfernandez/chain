@@ -16,6 +16,7 @@
   "dependencies": {
     "babel-polyfill": "^6.16.0",
     "bootstrap-sass": "~3.3.7",
+    "chain-sdk": "^1.0.0",
     "fetch-ponyfill": "^3.0.2",
     "lodash.pick": "^4.4.0",
     "lodash.uniq": "^4.5.0",
