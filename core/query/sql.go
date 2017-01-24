@@ -34,6 +34,7 @@ var (
 		Columns: map[string]*filter.SQLColumn{
 			"type":             {Name: "type", Type: filter.String, SQLType: filter.SQLText},
 			"purpose":          {Name: "purpose", Type: filter.String, SQLType: filter.SQLText},
+			"transaction_id":   {Name: "tx_hash", Type: filter.String, SQLType: filter.SQLBytea},
 			"position":         {Name: "output_index", Type: filter.Integer, SQLType: filter.SQLInteger},
 			"asset_id":         {Name: "asset_id", Type: filter.String, SQLType: filter.SQLBytea},
 			"asset_alias":      {Name: "asset_alias", Type: filter.String, SQLType: filter.SQLText},
