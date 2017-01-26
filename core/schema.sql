@@ -918,4 +918,4 @@ insert into migrations (filename, hash) values ('2017-01-10.0.signers.xpubs-type
 insert into migrations (filename, hash) values ('2017-01-11.0.core.hash-bytea.sql', '9f7f15df3479c38f193884a2d3cb7ae8001ed08607f9cc661fd5c420e248688d');
 insert into migrations (filename, hash) values ('2017-01-13.0.core.asset-definition-bytea.sql', 'f49458c5c8873d919ec35be4683074be0b04913c95f5ab1bf1402aa2b4847cf5');
 insert into migrations (filename, hash) values ('2017-01-19.0.asset.drop-mutable-flag.sql', '7850023d44c545c155c0ee372e7cdfef1859b40221bd94307b836503c26dd3de');
-insert into migrations (filename, hash) values ('2017-01-23.0.query.annotated-schema.sql', '4a8d89ecf8a008dd35bb956587127c0becce5ffb75976c50b9a767058b18f4b9');
+insert into migrations (filename, hash) values ('2017-01-23.0.query.annotated-schema.sql', '09a727bcb49866bdd5fdd0b3bfc42f13c690b1011b3100649eb0c66f1b244108');

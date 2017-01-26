@@ -196,6 +196,28 @@ var migrations = []migration{
 		);
 
 		--
+		-- Backfill all of the annotated inputs O_O
+		--
+		INSERT INTO annotated_inputs
+		SELECT
+			tx_hash,
+			idx-1 AS index,
+			inp->>'type' AS type,
+			decode(inp->>'asset_id', 'hex') AS asset_id,
+			inp->>'asset_alias' AS asset_alias,
+			COALESCE(inp->'asset_definition', '{}'::jsonb) AS asset_definition,
+			COALESCE(inp->'asset_tags', '{}'::jsonb) AS asset_tags,
+			(inp->>'asset_is_local' = 'yes') AS asset_local,
+			(inp->>'amount')::bigint AS amount,
+			inp->>'account_id' AS account_id,
+			inp->>'account_alias' AS account_alias,
+			inp->'account_tags' AS account_tags,
+			decode(COALESCE(inp->>'issuance_program', E''), 'hex') AS issuance_program,
+			COALESCE(inp->'reference_data', '{}'::jsonb) AS reference_data,
+			(inp->>'is_local' = 'yes') AS local
+		FROM annotated_txs, jsonb_array_elements(annotated_txs.data->'inputs') WITH ORDINALITY AS inputs (inp, idx);
+
+		--
 		-- Flatten annotated_assets into schema.
 		--
 		ALTER TABLE annotated_assets
