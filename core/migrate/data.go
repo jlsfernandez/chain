@@ -128,9 +128,9 @@ var migrations = []migration{
 			ADD COLUMN local boolean;
 		UPDATE annotated_outputs SET
 			type             = data->>'type',
-			purpose          = COALESCE(data->>'purpose', E''),
+			purpose          = COALESCE(data->>'purpose', ''),
 			asset_id         = decode(data->>'asset_id', 'hex'),
-			asset_alias      = COALESCE(data->>'asset_alias', E''),
+			asset_alias      = COALESCE(data->>'asset_alias', ''),
 			asset_definition = COALESCE(data->'asset_definition', '{}'::jsonb),
 			asset_tags       = COALESCE(data->'asset_tags', '{}'::jsonb),
 			asset_local      = (data->>'asset_is_local'='yes'),
@@ -212,7 +212,7 @@ var migrations = []migration{
 			inp->>'account_id' AS account_id,
 			inp->>'account_alias' AS account_alias,
 			inp->'account_tags' AS account_tags,
-			decode(COALESCE(inp->>'issuance_program', E''), 'hex') AS issuance_program,
+			decode(COALESCE(inp->>'issuance_program', ''), 'hex') AS issuance_program,
 			COALESCE(inp->'reference_data', '{}'::jsonb) AS reference_data,
 			(inp->>'is_local' = 'yes') AS local
 		FROM annotated_txs, jsonb_array_elements(annotated_txs.data->'inputs') WITH ORDINALITY AS inputs (inp, idx);
