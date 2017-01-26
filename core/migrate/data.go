@@ -125,21 +125,21 @@ var migrations = []migration{
 			ADD COLUMN account_tags jsonb,
 			ADD COLUMN control_program bytea,
 			ADD COLUMN reference_data jsonb,
-			ADD COLUMN local boolean NOT NULL;
+			ADD COLUMN local boolean;
 		UPDATE annotated_outputs SET
 			type             = data->>'type',
-			purpose          = data->>'purpose',
+			purpose          = COALESCE(data->>'purpose', E''),
 			asset_id         = decode(data->>'asset_id', 'hex'),
-			asset_alias      = data->>'asset_alias',
-			asset_definition = data->'asset_definition',
-			asset_tags       = data->'asset_tags',
+			asset_alias      = COALESCE(data->>'asset_alias', E''),
+			asset_definition = COALESCE(data->'asset_definition', '{}'::jsonb),
+			asset_tags       = COALESCE(data->'asset_tags', '{}'::jsonb),
 			asset_local      = (data->>'asset_is_local'='yes'),
 			amount           = (data->>'amount')::bigint,
 			account_id       = data->>'account_id',
 			account_alias    = data->>'account_alias',
 			account_tags     = data->'account_tags',
 			control_program  = decode(data->>'control_program', 'hex'),
-			reference_data   = data->'reference_data',
+			reference_data   = COALESCE(data->'reference_data', '{}'::jsonb),
 			local            = (data->>'is_local' = 'yes');
 		ALTER TABLE annotated_outputs
 			ALTER COLUMN type SET NOT NULL,
@@ -166,7 +166,7 @@ var migrations = []migration{
 		    "timestamp"    = (data->>'timestamp')::timestamp without time zone,
 			block_id       = decode(data->>'block_id', 'hex'),
 			local          = (data->>'is_local' = 'yes'),
-			reference_data = data->'reference_data';
+			reference_data = COALESCE(data->'reference_data', '{}'::jsonb);
 		ALTER TABLE annotated_txs
 			ALTER COLUMN timestamp SET NOT NULL,
 			ALTER COLUMN block_id SET NOT NULL,
@@ -229,12 +229,12 @@ var migrations = []migration{
 			ADD COLUMN tags jsonb,
 			ADD COLUMN local boolean;
 		UPDATE annotated_assets SET
-			alias            = data->>'alias',
-			issuance_program = decode(data->>'issuance_program', 'hex'),
-			keys             = data->'keys',
+			alias            = COALESCE(data->>'alias', ''),
+			issuance_program = decode(COALESCE(data->>'issuance_program', ''), 'hex'),
+			keys             = COALESCE(data->'keys', '[]'::jsonb),
 			quorum           = (data->>'quorum')::integer,
-			definition       = data->'definition',
-			tags             = data->'tags',
+			definition       = COALESCE(data->'definition', '{}'::jsonb),
+			tags             = COALESCE(data->'tags', '{}'::jsonb),
 			local            = (data->>'is_local' = 'yes');
 		ALTER TABLE annotated_assets
 			ALTER COLUMN issuance_program SET NOT NULL,
@@ -254,10 +254,10 @@ var migrations = []migration{
 			ADD COLUMN quorum integer,
 			ADD COLUMN tags jsonb;
 		UPDATE annotated_accounts SET
-			alias  = data->>'alias',
-			keys   = data->'keys',
+			alias  = COALESCE(data->>'alias', ''),
+			keys   = COALESCE(data->'keys', '[]'::jsonb),
 			quorum = (data->>'quorum')::integer,
-			tags   = data->'tags';
+			tags   = COALESCE(data->'tags', '{}'::jsonb);
 		ALTER TABLE annotated_accounts
 			ALTER COLUMN keys SET NOT NULL,
 			ALTER COLUMN quorum SET NOT NULL,
